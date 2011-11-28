@@ -25,6 +25,7 @@ import org.codehaus.groovy.grails.plugins.DomainClassPluginSupport
 import org.codehaus.groovy.grails.validation.DefaultConstraintEvaluator
 import org.codehaus.groovy.grails.web.metaclass.BindDynamicMethod
 import org.codehaus.groovy.grails.web.pages.GroovyPage
+import org.codehaus.groovy.grails.web.pages.GroovyPagesMetaUtils;
 import org.codehaus.groovy.grails.web.pages.TagLibraryLookup
 import org.codehaus.groovy.grails.web.servlet.mvc.exceptions.ControllerExecutionException
 import org.codehaus.groovy.grails.web.util.StreamCharBuffer
@@ -272,21 +273,7 @@ class WebMetaUtils {
     }
 
     static registerMethodMissingForTags(MetaClass mc, TagLibraryLookup gspTagLibraryLookup, String namespace, String name) {
-        mc."$name" = {Map attrs, Closure body ->
-            GroovyPage.captureTagOutput(gspTagLibraryLookup, namespace, name, attrs, body, RCH.currentRequestAttributes())
-        }
-        mc."$name" = {Map attrs, CharSequence body ->
-            GroovyPage.captureTagOutput(gspTagLibraryLookup, namespace, name, attrs, new GroovyPage.ConstantClosure(body), RCH.currentRequestAttributes())
-        }
-        mc."$name" = {Map attrs ->
-            GroovyPage.captureTagOutput(gspTagLibraryLookup, namespace, name, attrs, null, RCH.currentRequestAttributes())
-        }
-        mc."$name" = {Closure body ->
-            GroovyPage.captureTagOutput(gspTagLibraryLookup, namespace, name, [:], body, RCH.currentRequestAttributes())
-        }
-        mc."$name" = {->
-            GroovyPage.captureTagOutput(gspTagLibraryLookup, namespace, name, [:], null, RCH.currentRequestAttributes())
-        }
+        GroovyPagesMetaUtils.registerMethodMissingForTags(mc, gspTagLibraryLookup, namespace, name, true)
     }
 
     static registerMethodMissingForTags(MetaClass mc, ApplicationContext ctx,
