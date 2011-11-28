@@ -76,6 +76,8 @@ public class DefaultUrlMappingsHolder implements UrlMappingsHolder {
     private UrlCreatorCache urlCreatorCache;
     // capacity of the UrlCreatoreCache is the estimated number of char's stored in cached objects
     private int urlCreatorMaxWeightedCacheCapacity = 160000;
+    private Map<String, String> cachedExcludes;
+    private static final String NO_EXCLUSION="NO_EXCLUSION";
 
     public DefaultUrlMappingsHolder(List<UrlMapping> mappings) {
         this(mappings, null, false);
@@ -95,7 +97,19 @@ public class DefaultUrlMappingsHolder implements UrlMappingsHolder {
 
     public void initialize() {
         sortMappings();
-
+        
+        cachedExcludes = new ConcurrentLinkedHashMap.Builder<String, String>()
+                .maximumWeightedCapacity(maxWeightedCacheCapacity)
+                .weigher(new Weigher<String>() {
+                    public int weightOf(String value) {
+                        if(value != null) {
+                            return value.length();
+                        }
+                        return 1;
+                    }
+                    
+                })
+                .build();
         cachedMatches = new ConcurrentLinkedHashMap.Builder<String, UrlMappingInfo>()
             .maximumWeightedCapacity(maxWeightedCacheCapacity)
             .build();
@@ -544,5 +558,44 @@ public class DefaultUrlMappingsHolder implements UrlMappingsHolder {
 
     public void setUrlCreatorMaxWeightedCacheCapacity(int urlCreatorMaxWeightedCacheCapacity) {
         this.urlCreatorMaxWeightedCacheCapacity = urlCreatorMaxWeightedCacheCapacity;
+    }
+
+    public boolean isExcluded(String uri) {
+        if (excludePatterns == null || excludePatterns.size() == 0) {
+            return false;
+        }
+        
+        boolean isExcluded = false;
+        
+        String cachedExclusion=cachedExcludes.get(uri);
+        if(cachedExclusion != null) {
+            return !(cachedExclusion==NO_EXCLUSION);
+        }
+        
+        for (Object excludePatternString : excludePatterns) {
+            String excludePattern = String.valueOf(excludePatternString);
+            int wildcardLen = 0;
+            if (excludePattern.endsWith("**")) {
+                wildcardLen = 2;
+            } else if (excludePattern.endsWith("*")) {
+                wildcardLen = 1;
+            }
+            if (wildcardLen > 0) {
+                excludePattern = excludePattern.substring(0,excludePattern.length() - wildcardLen);
+            }
+            if ((wildcardLen==0 && uri.equals(excludePattern)) || (wildcardLen > 0 && uri.startsWith(excludePattern))) {
+                isExcluded = true;
+                break;
+            }
+        }
+        
+        // cache the result, use uri as value so that the cache weighting calculation works
+        if(isExcluded) {
+            cachedExcludes.put(uri, uri);
+        } else {
+            cachedExcludes.put(uri, NO_EXCLUSION);
+        }
+        
+        return isExcluded;        
     }
 }

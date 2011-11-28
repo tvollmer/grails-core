@@ -76,7 +76,7 @@ class UrlMappingsUnitTestMixin extends ControllerUnitTestMixin {
     def mapURI(String uri) {
         UrlMappingsHolder mappingsHolder = getUrlMappingsHolder()
 
-        if (!UrlMappingsFilter.isUriExcluded(mappingsHolder, uri)) {
+        if (!mappingsHolder.isExcluded(uri)) {
             UrlMappingInfo[] mappingInfos = mappingsHolder.matchAll(uri, request.method)
             for (UrlMappingInfo info in mappingInfos) {
                 def backupParams = new HashMap(webRequest.params)

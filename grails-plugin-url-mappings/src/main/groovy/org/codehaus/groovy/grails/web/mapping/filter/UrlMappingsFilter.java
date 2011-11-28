@@ -19,8 +19,7 @@ import grails.web.UrlConverter;
 
 import java.io.IOException;
 import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
+import java.util.LinkedHashMap;
 import java.util.Map;
 
 import javax.servlet.FilterChain;
@@ -114,16 +113,17 @@ public class UrlMappingsFilter extends OncePerRequestFilter {
         UrlMappingsHolder holder = WebUtils.lookupUrlMappings(getServletContext());
 
         String uri = urlHelper.getPathWithinApplication(request);
+        if (holder.isExcluded(uri)) {
+            processFilterChain(request, response, filterChain);
+            return;
+        }
+        
         if (!"/".equals(uri) && noControllers() && noRegexMappings(holder)) {
             // not index request, no controllers, and no URL mappings for views, so it's not a Grails request
             processFilterChain(request, response, filterChain);
             return;
         }
 
-        if (isUriExcluded(holder, uri)) {
-            processFilterChain(request, response, filterChain);
-            return;
-        }
 
         if (LOG.isDebugEnabled()) {
             LOG.debug("Executing URL mapping filter...");
@@ -151,73 +151,76 @@ public class UrlMappingsFilter extends OncePerRequestFilter {
         boolean dispatched = false;
         try {
             // GRAILS-3369: Save the original request parameters.
-            Map backupParameters;
-            try {
-                backupParameters = new HashMap(webRequest.getParams());
-            }
-            catch (Exception e) {
-                LOG.error("Error creating params object: " + e.getMessage(), e);
-                backupParameters = Collections.EMPTY_MAP;
+            Map backupParameters=null;
+            if(urlInfos.length > 0) {
+                try {
+                    backupParameters = new LinkedHashMap(webRequest.getParams());
+                }
+                catch (Exception e) {
+                    LOG.error("Error creating params object: " + e.getMessage(), e);
+                    backupParameters = Collections.EMPTY_MAP;
+                }
             }
 
+            int urlInfoIndex=0;
             for (UrlMappingInfo info : urlInfos) {
-                if (info != null) {
+                if(urlInfoIndex++ > 0) {
                     // GRAILS-3369: The configure() will modify the
                     // parameter map attached to the web request. So,
                     // we need to clear it each time and restore the
                     // original request parameters.
                     webRequest.getParams().clear();
                     webRequest.getParams().putAll(backupParameters);
-
-                    final String viewName;
-                    try {
-                        info.configure(webRequest);
-                        String action = info.getActionName() == null ? "" : info.getActionName();
-                        viewName = info.getViewName();
-                        if (viewName == null && info.getURI() == null) {
-                            final String controllerName = info.getControllerName();
-                            GrailsClass controller = application.getArtefactForFeature(ControllerArtefactHandler.TYPE, WebUtils.SLASH + urlConverter.toUrlElement(controllerName) + WebUtils.SLASH + urlConverter.toUrlElement(action));
-                            if (controller == null) {
-                                continue;
-                            }
-
-                            webRequest.setAttribute(GrailsApplicationAttributes.CONTROLLER_NAME_ATTRIBUTE, controller.getLogicalPropertyName(), WebRequest.SCOPE_REQUEST);
-                        }
-                    }
-                    catch (Exception e) {
-                        if (e instanceof MultipartException) {
-                            reapplySitemesh(request);
-                            throw ((MultipartException)e);
-                        }
-                        LOG.error("Error when matching URL mapping [" + info + "]:" + e.getMessage(), e);
-                        continue;
-                    }
-
-                    dispatched = true;
-
-                    if (!WAR_DEPLOYED) {
-                        checkDevelopmentReloadingState(request);
-                    }
-
-
-                    request = checkMultipart(request);
-
-                    if (viewName == null || viewName.endsWith(GSP_SUFFIX) || viewName.endsWith(JSP_SUFFIX)) {
-                        if (info.isParsingRequest()) {
-                            webRequest.informParameterCreationListeners();
-                        }
-                        String forwardUrl = WebUtils.forwardRequestForUrlMappingInfo(request, response, info);
-                        if (LOG.isDebugEnabled()) {
-                            LOG.debug("Matched URI [" + uri + "] to URL mapping [" + info + "], forwarding to [" + forwardUrl + "] with response [" + response.getClass() + "]");
-                        }
-                    }
-                    else {
-                        if (!renderViewForUrlMappingInfo(request, response, info, viewName)) {
-                            dispatched = false;
-                        }
-                    }
-                    break;
                 }
+
+                final String viewName;
+                try {
+                    info.configure(webRequest);
+                    String action = info.getActionName() == null ? "" : info.getActionName();
+                    viewName = info.getViewName();
+                    if (viewName == null && info.getURI() == null) {
+                        final String controllerName = info.getControllerName();
+                        GrailsClass controller = application.getArtefactForFeature(ControllerArtefactHandler.TYPE, WebUtils.SLASH + urlConverter.toUrlElement(controllerName) + WebUtils.SLASH + urlConverter.toUrlElement(action));
+                        if (controller == null) {
+                            continue;
+                        }
+
+                        webRequest.setAttribute(GrailsApplicationAttributes.CONTROLLER_NAME_ATTRIBUTE, controller.getLogicalPropertyName(), WebRequest.SCOPE_REQUEST);
+                    }
+                }
+                catch (Exception e) {
+                    if (e instanceof MultipartException) {
+                        reapplySitemesh(request);
+                        throw ((MultipartException)e);
+                    }
+                    LOG.error("Error when matching URL mapping [" + info + "]:" + e.getMessage(), e);
+                    continue;
+                }
+
+                dispatched = true;
+
+                if (!WAR_DEPLOYED) {
+                    checkDevelopmentReloadingState(request);
+                }
+
+
+                request = checkMultipart(request);
+
+                if (viewName == null || viewName.endsWith(GSP_SUFFIX) || viewName.endsWith(JSP_SUFFIX)) {
+                    if (info.isParsingRequest()) {
+                        webRequest.informParameterCreationListeners();
+                    }
+                    String forwardUrl = WebUtils.forwardRequestForUrlMappingInfo(request, response, info);
+                    if (LOG.isDebugEnabled()) {
+                        LOG.debug("Matched URI [" + uri + "] to URL mapping [" + info + "], forwarding to [" + forwardUrl + "] with response [" + response.getClass() + "]");
+                    }
+                }
+                else {
+                    if (!renderViewForUrlMappingInfo(request, response, info, viewName)) {
+                        dispatched = false;
+                    }
+                }
+                break;
             }
         }
         finally {
@@ -232,28 +235,9 @@ public class UrlMappingsFilter extends OncePerRequestFilter {
         }
     }
 
+    @Deprecated
     public static boolean isUriExcluded(UrlMappingsHolder holder, String uri) {
-        boolean isExcluded = false;
-        @SuppressWarnings("unchecked")
-        List<String> excludePatterns = holder.getExcludePatterns();
-        if (excludePatterns != null && excludePatterns.size() > 0) {
-            for (String excludePattern : excludePatterns) {
-                int wildcardLen = 0;
-                if (excludePattern.endsWith("**")) {
-                    wildcardLen = 2;
-                } else if (excludePattern.endsWith("*")) {
-                    wildcardLen = 1;
-                }
-                if (wildcardLen > 0) {
-                    excludePattern = excludePattern.substring(0,excludePattern.length() - wildcardLen);
-                }
-                if ((wildcardLen==0 && uri.equals(excludePattern)) || (wildcardLen > 0 && uri.startsWith(excludePattern))) {
-                    isExcluded = true;
-                    break;
-                }
-            }
-        }
-        return isExcluded;
+        return holder.isExcluded(uri);
     }
 
     private boolean areFileExtensionsEnabled() {

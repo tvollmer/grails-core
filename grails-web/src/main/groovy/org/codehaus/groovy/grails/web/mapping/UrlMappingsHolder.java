@@ -107,4 +107,13 @@ public interface UrlMappingsHolder {
      * @return The UrlMappingInfo instance
      */
     UrlMappingInfo matchStatusCode(int responseCode, Throwable e);
+    
+    
+    /**
+     * Is uri excluded
+     * 
+     * @param uri
+     * @return
+     */
+    boolean isExcluded(String uri);
 }
