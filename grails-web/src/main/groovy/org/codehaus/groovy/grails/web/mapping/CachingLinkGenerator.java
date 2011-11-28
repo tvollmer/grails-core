@@ -138,7 +138,7 @@ public class CachingLinkGenerator extends DefaultLinkGenerator {
 
     @Override
     public String resource(Map attrs) {
-        final String key = RESOURCE_PREFIX + attrs;
+        final String key = RESOURCE_PREFIX + createKey(attrs);
         Object resourceLink = linkCache.get(key);
         if (resourceLink == null) {
             resourceLink = super.resource(attrs);
