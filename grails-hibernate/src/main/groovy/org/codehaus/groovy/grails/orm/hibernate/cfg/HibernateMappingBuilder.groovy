@@ -263,6 +263,7 @@ class HibernateMappingBuilder {
                 LOG.warn("ORM Mapping Invalid: Specified [include] with value [$args.include] of [cache] in class [$className] is not valid")
             }
         }
+        mapping.cache.region = args.region
     }
 
     /**
@@ -443,18 +444,23 @@ class HibernateMappingBuilder {
             else if (namedArgs.cache instanceof Map) {
                 def cacheArgs = namedArgs.cache
                 CacheConfig cc = new CacheConfig()
-                if (CacheConfig.USAGE_OPTIONS.contains(cacheArgs.usage)) {
-                    cc.usage = cacheArgs.usage
+                if (cacheArgs.usage) {
+                    if (CacheConfig.USAGE_OPTIONS.contains(cacheArgs.usage)) {
+                        cc.usage = cacheArgs.usage
+                    }
+                    else {
+                        LOG.warn("ORM Mapping Invalid: Specified [usage] of [cache] with value [$args.usage] for association [$name] in class [$className] is not valid")
+                    }
                 }
-                else {
-                    LOG.warn("ORM Mapping Invalid: Specified [usage] of [cache] with value [$args.usage] for association [$name] in class [$className] is not valid")
+                if (cacheArgs.include) {
+                    if (CacheConfig.INCLUDE_OPTIONS.contains(cacheArgs.include)) {
+                        cc.include = cacheArgs.include
+                    }
+                    else {
+                        LOG.warn("ORM Mapping Invalid: Specified [include] of [cache] with value [$args.include] for association [$name] in class [$className] is not valid")
+                    }
                 }
-                if (CacheConfig.INCLUDE_OPTIONS.contains(cacheArgs.include)) {
-                    cc.include = cacheArgs.include
-                }
-                else {
-                    LOG.warn("ORM Mapping Invalid: Specified [include] of [cache] with value [$args.include] for association [$name] in class [$className] is not valid")
-                }
+                cc.region = cacheArgs.region
                 property.cache = cc
             }
 

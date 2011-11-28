@@ -28,4 +28,5 @@ class CacheConfig {
     String usage = "read-write"
     boolean enabled = false
     String include = "all"
+    String region = null
 }

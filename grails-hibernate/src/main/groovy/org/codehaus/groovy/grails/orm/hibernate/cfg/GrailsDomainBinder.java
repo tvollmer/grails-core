@@ -528,6 +528,9 @@ public final class GrailsDomainBinder {
             CacheConfig cacheConfig = propConfig.getCache();
             if (cacheConfig != null) {
                 collection.setCacheConcurrencyStrategy(cacheConfig.getUsage());
+                if(cacheConfig.getRegion() != null) {
+                    collection.setCacheRegionName(cacheConfig.getRegion());
+                }
             }
         }
 
@@ -1571,6 +1574,9 @@ public final class GrailsDomainBinder {
                     root.setMutable(false);
                 }
                 root.setLazyPropertiesCacheable(!"non-lazy".equals(cc.getInclude()));
+                if(cc.getRegion() != null) {
+                    root.setCacheRegionName(cc.getRegion());
+                }
             }
 
             Integer bs = m.getBatchSize();
