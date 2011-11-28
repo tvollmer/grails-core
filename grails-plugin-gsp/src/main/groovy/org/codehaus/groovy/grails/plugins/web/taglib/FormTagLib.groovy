@@ -285,7 +285,7 @@ class FormTagLib {
 
         def writer = getOut()
 
-        def linkAttrs = attrs.subMap(LinkGenerator.LINK_ATTRIBUTES)
+        def linkAttrs = [:] + attrs.subMap(attrs.keySet().intersect(LinkGenerator.LINK_ATTRIBUTES))
 
         writer << "<form action=\""
         writer << createLink(linkAttrs)
