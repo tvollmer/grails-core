@@ -23,12 +23,17 @@ import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
+import org.codehaus.groovy.grails.commons.GrailsApplication;
+import org.codehaus.groovy.grails.commons.cfg.GrailsConfig;
+import org.codehaus.groovy.grails.web.mapping.UrlMappingsHolder;
 import org.codehaus.groovy.grails.web.servlet.FlashScope;
+import org.codehaus.groovy.grails.web.sitemesh.GrailsPageFilter;
 import org.codehaus.groovy.grails.web.util.WebUtils;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.web.context.support.WebApplicationContextUtils;
 import org.springframework.web.filter.OncePerRequestFilter;
+import org.springframework.web.util.UrlPathHelper;
 
 /**
  * Binds a {@link GrailsWebRequestFilter} to the currently executing thread.
@@ -38,7 +43,9 @@ import org.springframework.web.filter.OncePerRequestFilter;
  */
 public class GrailsWebRequestFilter extends OncePerRequestFilter {
     Collection<ParameterCreationListener> paramListenerBeans;
-
+    private UrlPathHelper urlHelper = new UrlPathHelper();
+    boolean processExcludedWithSitemesh = false;
+    
     /* (non-Javadoc)
      * @see org.springframework.web.filter.OncePerRequestFilter#doFilterInternal(
      *     javax.servlet.http.HttpServletRequest, javax.servlet.http.HttpServletResponse, javax.servlet.FilterChain)
@@ -46,34 +53,43 @@ public class GrailsWebRequestFilter extends OncePerRequestFilter {
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
             throws ServletException, IOException {
-
-        LocaleContextHolder.setLocale(request.getLocale());
-        GrailsWebRequest webRequest = new GrailsWebRequest(request, response, getServletContext());
-        configureParameterCreationListeners(webRequest);
-
-        if (logger.isDebugEnabled()) {
-            logger.debug("Bound Grails request context to thread: " + request);
-        }
-
-        try {
-            WebUtils.storeGrailsWebRequest(webRequest);
-
-            // Set the flash scope instance to its next state. We do
-            // this here so that the flash is available from Grails
-            // filters in a valid state.
-            FlashScope fs = webRequest.getAttributes().getFlashScope(request);
-            fs.next();
-
-            // Pass control on to the next filter (or the servlet if
-            // there are no more filters in the chain).
+        String uri = urlHelper.getPathWithinApplication(request);
+        UrlMappingsHolder holder = WebUtils.lookupUrlMappings(getServletContext());
+        if(holder.isExcluded(uri)) {
+            if(!processExcludedWithSitemesh) {
+                // skip Sitemesh filter for request                
+                request.setAttribute(GrailsPageFilter.ALREADY_APPLIED_KEY, Boolean.TRUE);
+            }
             filterChain.doFilter(request, response);
-        }
-        finally {
-            webRequest.requestCompleted();
-            WebUtils.clearGrailsWebRequest();
-            LocaleContextHolder.setLocale(null);
+        } else {
+            LocaleContextHolder.setLocale(request.getLocale());
+            GrailsWebRequest webRequest = new GrailsWebRequest(request, response, getServletContext());
+            configureParameterCreationListeners(webRequest);
+    
             if (logger.isDebugEnabled()) {
-                logger.debug("Cleared Grails thread-bound request context: " + request);
+                logger.debug("Bound Grails request context to thread: " + request);
+            }
+    
+            try {
+                WebUtils.storeGrailsWebRequest(webRequest);
+    
+                // Set the flash scope instance to its next state. We do
+                // this here so that the flash is available from Grails
+                // filters in a valid state.
+                FlashScope fs = webRequest.getAttributes().getFlashScope(request);
+                fs.next();
+    
+                // Pass control on to the next filter (or the servlet if
+                // there are no more filters in the chain).
+                filterChain.doFilter(request, response);
+            }
+            finally {
+                webRequest.requestCompleted();
+                WebUtils.clearGrailsWebRequest();
+                LocaleContextHolder.setLocale(null);
+                if (logger.isDebugEnabled()) {
+                    logger.debug("Cleared Grails thread-bound request context: " + request);
+                }
             }
         }
     }
@@ -101,5 +117,9 @@ public class GrailsWebRequestFilter extends OncePerRequestFilter {
         } else {
             logger.warn("appCtx not found in servletContext");
         }
+        urlHelper.setUrlDecode(false);
+        GrailsApplication grailsApplication = WebUtils.lookupApplication(getServletContext());
+        GrailsConfig grailsConfig = new GrailsConfig(grailsApplication);
+        processExcludedWithSitemesh = grailsConfig.get("grails.sitemesh.process.excluded", Boolean.FALSE);
     }
 }
