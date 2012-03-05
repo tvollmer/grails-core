@@ -1,7 +1,28 @@
 <%=packageName%>
 <% import grails.persistence.Event %>
+<% import org.codehaus.groovy.grails.commons.* %>
 
-<%  excludedProps = Event.allEvents.toList() << 'version' << 'dateCreated' << 'lastUpdated'
+<%
+def domainSuffix = "Instance"
+
+class MyScaffoldingGrailsDomainClassProperty {
+
+    @Delegate
+    GrailsDomainClassProperty grailsDomainClassProperty
+
+    String propertyPath
+    String domainSuffix
+    
+    String getNullsafePropertyPath(){
+        propertyPath.replaceAll(/\./, '?.')
+    }
+    
+    String getPropertyPathFieldName(){
+        propertyPath.replaceAll("(^.*${domainSuffix}\\.)(.*\$)", '\$2')
+    }
+}
+
+    excludedProps = Event.allEvents.toList() << 'version' << 'dateCreated' << 'lastUpdated'
 	persistentPropNames = domainClass.persistentProperties*.name
 	boolean hasHibernate = pluginManager?.hasGrailsPlugin('hibernate')
 	if (hasHibernate && org.codehaus.groovy.grails.orm.hibernate.cfg.GrailsDomainBinder.getMapping(domainClass)?.identity?.generator == 'assigned') {
@@ -16,10 +37,12 @@
 			Collections.sort(embeddedProps, comparator.constructors[0].newInstance([p.component] as Object[]))
 			%><fieldset class="embedded"><legend><g:message code="${domainClass.propertyName}.${p.name}.label" default="${p.naturalName}" /></legend><%
 				for (ep in p.component.properties) {
-					renderFieldForProperty(ep, p.component, "${p.name}.")
+					MyScaffoldingGrailsDomainClassProperty sProp = new MyScaffoldingGrailsDomainClassProperty(grailsDomainClassProperty:ep,propertyPath:"${domainClass.propertyName}${domainSuffix}.${p.name}.${ep.name}",domainSuffix:domainSuffix)
+					renderFieldForProperty(sProp, p.component, "${p.name}.")
 				}
 			%></fieldset><%
 		} else {
+			MyScaffoldingGrailsDomainClassProperty sProp = new MyScaffoldingGrailsDomainClassProperty(grailsDomainClassProperty:p,propertyPath:"${domainClass.propertyName}${domainSuffix}.${p.name}",domainSuffix:domainSuffix)
 			renderFieldForProperty(p, domainClass)
 		}
 	}
