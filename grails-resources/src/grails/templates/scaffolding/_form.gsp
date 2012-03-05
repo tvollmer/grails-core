@@ -43,7 +43,7 @@ class MyScaffoldingGrailsDomainClassProperty {
 			%></fieldset><%
 		} else {
 			MyScaffoldingGrailsDomainClassProperty sProp = new MyScaffoldingGrailsDomainClassProperty(grailsDomainClassProperty:p,propertyPath:"${domainClass.propertyName}${domainSuffix}.${p.name}",domainSuffix:domainSuffix)
-			renderFieldForProperty(p, domainClass)
+			renderFieldForProperty(sProp, domainClass)
 		}
 	}
 
